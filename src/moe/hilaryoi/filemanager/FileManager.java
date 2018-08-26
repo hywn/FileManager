@@ -64,10 +64,10 @@ public class FileManager extends JPanel {
 
 		try {
 
-			File file = new File (db.getPath () + path);
-			File toTrash = new File (trashPath.toString (), System.currentTimeMillis () + file.getName ());
+			Path file = Paths.get (db.getPath (), path);
+			Path toTrash = Paths.get (trashPath.toString (), System.currentTimeMillis () + file.getName (file.getNameCount () - 1).toString ());
 
-			Files.move (Paths.get (file.getPath ()), Paths.get (toTrash.getPath ()));
+			Files.move (file, toTrash);
 
 			db.removeItem (path);
 
