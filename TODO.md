@@ -3,3 +3,4 @@
 * search by tags
 * tag editor in launcher
 * albums ?
+* mass tagging/naming?
