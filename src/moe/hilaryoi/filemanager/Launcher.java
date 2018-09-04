@@ -104,7 +104,7 @@ public class Launcher extends JPanel {
 		try { db = new Database (pathDb); }
 		catch (SQLException e) { System.err.println ("Could not open empty database."); e.printStackTrace (); return; }
 
-		try { db.create (); System.out.printf ("Created database at path `%s`.", db.getPath ()); db.close (); }
+		try { db.create (); System.out.printf ("Created database at path `%s`.\n", db.getPath ()); db.close (); }
 		catch (Exception e) {System.err.println ("Could not create empty database."); e.printStackTrace ();}
 
 

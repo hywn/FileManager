@@ -255,8 +255,6 @@ public class Database {
 
 		s.close ();
 
-		System.out.println (b.toString ());
-
 
 	}
 
