@@ -151,6 +151,12 @@ public class Database {
 
 	}
 
+	public String getFilteredData (String data) {
+
+		return data.replaceAll ("'", "''");
+
+	}
+
 	public static void getPaths (Path dir, ArrayList<Path> paths) throws IOException {
 
 		Files.list (dir).forEach ((path) -> {
@@ -186,7 +192,7 @@ public class Database {
 
 		//TODO: dunno if reusing statement is best
 		executeSingle (String.format ("insert into files values ('%s', '%s', %s, %s)",
-			relativePath, "Untitled", Files.size (path), creationDate (path).toMillis ()));
+			getFilteredData (relativePath), "Untitled", Files.size (path), creationDate (path).toMillis ()));
 
 		System.out.println ("Added " + relativePath);
 
@@ -207,7 +213,7 @@ public class Database {
 
 	public void removeTag (Tag tag, String filePath) throws SQLException { executeSingle (String.format ("delete from tagged where tag=%d and path='%s'", tag.getId (), filePath));}
 
-	public void updateTitle (String title, String filePath) throws SQLException { executeSingle (String.format ("update files set title='%s' where path='%s'", title, filePath)); }
+	public void updateTitle (String title, String filePath) throws SQLException { executeSingle (String.format ("update files set title='%s' where path='%s'", getFilteredData (title), filePath)); }
 
 	private void executeSingle (String sql) throws SQLException {
 
