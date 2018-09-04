@@ -22,7 +22,7 @@ public class Launcher extends JPanel {
 		prefs = Preferences.userNodeForPackage (Launcher.class);
 
 
-		JButton butLaunch, butRefresh;
+		JButton butLaunch, butRefresh, butCreateDb;
 
 		fieldDbPath = new JTextField (prefs.get (KEY_PATH_DB, "path to db"), 20);
 		fieldTrashPath = new JTextField (prefs.get (KEY_PATH_TRASH, "path to trash"), 20);
@@ -33,7 +33,10 @@ public class Launcher extends JPanel {
 		butRefresh = new JButton ("refresh");
 		butRefresh.addActionListener ((event) -> refreshFiles (fieldDbPath.getText ()));
 
-		add (fieldDbPath); add (fieldTrashPath); add (butLaunch); add (butRefresh);
+		butCreateDb = new JButton ("create");
+		butCreateDb.addActionListener ((event) -> createDb (fieldDbPath.getText ()));
+
+		add (fieldDbPath); add (fieldTrashPath); add (butLaunch); add (butRefresh); add (butCreateDb);
 
 	}
 
@@ -93,4 +96,18 @@ public class Launcher extends JPanel {
 		});
 
 	}
+
+	private void createDb (String pathDb) {
+
+		Database db;
+
+		try { db = new Database (pathDb); }
+		catch (SQLException e) { System.err.println ("Could not open empty database."); e.printStackTrace (); return; }
+
+		try { db.create (); System.out.printf ("Created database at path `%s`.", db.getPath ()); db.close (); }
+		catch (Exception e) {System.err.println ("Could not create empty database."); e.printStackTrace ();}
+
+
+	}
+
 }

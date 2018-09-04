@@ -2,7 +2,9 @@ package moe.hilaryoi.filemanager;
 
 import moe.hilaryoi.filemanager.gui.ItemEditor;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -230,6 +232,31 @@ public class Database {
 			return null;
 
 		}
+
+	}
+
+	public void create () throws SQLException, IOException {
+
+		BufferedReader bf = new BufferedReader (new InputStreamReader (this.getClass ().getResourceAsStream ("/createdb.sql")));
+
+		String line;
+		StringBuilder b = new StringBuilder ();
+
+		while ((line = bf.readLine ()) != null) {
+
+			b.append (line);
+
+		}
+
+		Statement s = c.createStatement ();
+
+		String[] statements = b.toString ().split (";");
+		for (String statement : statements) s.execute (statement);
+
+		s.close ();
+
+		System.out.println (b.toString ());
+
 
 	}
 
