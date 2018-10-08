@@ -100,7 +100,7 @@ public class Database {
 
 		Statement s = c.createStatement ();
 
-		ResultSet rs = s.executeQuery (String.format ("select tag from tagged where path='%s'", path));
+		ResultSet rs = s.executeQuery (String.format ("select tag from tagged where path='%s'", getFilteredData (path)));
 
 		while (rs.next ()) { tagIds.add (rs.getInt ("tag")); }
 
@@ -135,13 +135,13 @@ public class Database {
 
 			}
 
-			String relativePath = path.subpath (nameCountDir, path.getNameCount ()).toString ();
+			String sqlPath = getFilteredData (path.subpath (nameCountDir, path.getNameCount ()).toString ());
 
-			ResultSet rs = s.executeQuery (String.format ("select * from files where path='%s'", relativePath));
+			ResultSet rs = s.executeQuery (String.format ("select * from files where path='%s'", sqlPath));
 
 			if (rs.next ()) continue;
 
-			try { addItem (path, relativePath); }
+			try { addItem (path, sqlPath); }
 			catch (IOException e) { System.err.printf ("Could not find file `%s`.", path); }
 
 		}
@@ -174,13 +174,15 @@ public class Database {
 
 	}
 
+	//TODO: always filter strings
+
 	public void setItem (ItemEditor ie, String path) throws SQLException {
 
 		Statement s = c.createStatement ();
 
-		ResultSet rs = s.executeQuery (String.format ("select * from files where path='%s'", path));
+		ResultSet rs = s.executeQuery (String.format ("select * from files where path='%s'", getFilteredData (path)));
 
-		if (rs.next ()) ie.setItem (rs.getString ("path"), rs.getString ("title"), rs.getLong ("size"), rs.getLong ("datecreated"), getTags (path));
+		if (rs.next ()) ie.setItem (getFilteredData (rs.getString ("path")), getFilteredData (rs.getString ("title")), rs.getLong ("size"), rs.getLong ("datecreated"), getTags (path));
 
 		rs.close (); s.close ();
 
@@ -188,13 +190,13 @@ public class Database {
 
 	// path, title, size, datecreated
 
-	public void addItem (Path path, String relativePath) throws SQLException, IOException {
+	public void addItem (Path path, String sqlPath) throws SQLException, IOException {
 
 		//TODO: dunno if reusing statement is best
 		executeSingle (String.format ("insert into files values ('%s', '%s', %s, %s)",
-			getFilteredData (relativePath), "Untitled", Files.size (path), creationDate (path).toMillis ()));
+			sqlPath, "Untitled", Files.size (path), creationDate (path).toMillis ()));
 
-		System.out.println ("Added " + relativePath);
+		System.out.println ("Added " + sqlPath);
 
 	}
 
@@ -202,18 +204,20 @@ public class Database {
 
 		Statement s = c.createStatement ();
 
-		s.execute (String.format ("delete from files where path='%s'", path));
-		s.execute (String.format ("delete from tagged where path='%s'", path));
+		String sqlPath = getFilteredData (path);
+
+		s.execute (String.format ("delete from files where path='%s'", sqlPath));
+		s.execute (String.format ("delete from tagged where path='%s'", sqlPath));
 
 		s.close ();
 
 	}
 
-	public void addTag (Tag tag, String filePath) throws SQLException { executeSingle (String.format ("insert into tagged (tag, path) values (%d, '%s')", tag.getId (), filePath));}
+	public void addTag (Tag tag, String filePath) throws SQLException { executeSingle (String.format ("insert into tagged (tag, path) values (%d, '%s')", tag.getId (), getFilteredData (filePath)));}
 
-	public void removeTag (Tag tag, String filePath) throws SQLException { executeSingle (String.format ("delete from tagged where tag=%d and path='%s'", tag.getId (), filePath));}
+	public void removeTag (Tag tag, String filePath) throws SQLException { executeSingle (String.format ("delete from tagged where tag=%d and path='%s'", tag.getId (), getFilteredData (filePath)));}
 
-	public void updateTitle (String title, String filePath) throws SQLException { executeSingle (String.format ("update files set title='%s' where path='%s'", getFilteredData (title), filePath)); }
+	public void updateTitle (String title, String filePath) throws SQLException { executeSingle (String.format ("update files set title='%s' where path='%s'", getFilteredData (title), getFilteredData (filePath))); }
 
 	private void executeSingle (String sql) throws SQLException {
 
