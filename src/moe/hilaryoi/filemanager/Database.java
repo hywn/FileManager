@@ -142,7 +142,7 @@ public class Database {
 			if (rs.next ()) continue;
 
 			try { addItem (path, sqlPath); }
-			catch (IOException e) { System.err.printf ("Could not find file `%s`.", path); }
+			catch (IOException e) { System.err.printf ("Could not find file `%s`.%n", path); }
 
 		}
 
