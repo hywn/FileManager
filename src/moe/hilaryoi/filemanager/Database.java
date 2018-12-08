@@ -13,6 +13,8 @@ import java.nio.file.attribute.FileTime;
 import java.sql.*;
 import java.util.ArrayList;
 
+import static java.lang.String.format;
+
 public class Database {
 
 	private Connection c;
@@ -43,17 +45,9 @@ public class Database {
 
 		Statement s = c.createStatement ();
 
-		// is this bad because can't close the ResultSet?
-		// This is bad because if it's a query with less than max it is very inefficient
-		int rows = s.executeQuery ("select count (*) from files").getInt (1);
+		ArrayList<String[]> looseTable = new ArrayList<> ();
 
-		String[][] table = new String[rows][3];
-
-		int row = 0;
-
-		ResultSet rs = s.executeQuery ("select * from files order by datecreated desc");
-
-		while (rs.next ()) {
+		handleQuery (rs -> {
 
 			String path = rs.getString ("path");
 
@@ -65,12 +59,11 @@ public class Database {
 
 			}
 
-			table[row++] = new String[] { rs.getString ("title"), path, tags.toString () };
-		}
+			looseTable.add (new String[] { rs.getString ("title"), path, tags.toString () });
 
-		rs.close (); s.close ();
+		}, "select * from files order by datecreated desc");
 
-		return table;
+		return looseTable.toArray (new String[looseTable.size ()][looseTable.get (0).length]);
 
 	}
 
@@ -78,17 +71,8 @@ public class Database {
 
 		ArrayList<Tag> tags = new ArrayList<> ();
 
-		Statement s = c.createStatement ();
 
-		ResultSet rs = s.executeQuery ("select * from tags");
-
-		while (rs.next ()) {
-
-			tags.add (new Tag (rs.getInt ("id"), rs.getString ("title")));
-
-		}
-
-		rs.close (); s.close ();
+		handleQuery (rs -> tags.add (new Tag (rs.getInt ("id"), rs.getString ("title"))), "select * from tags");
 
 		return tags.toArray (new Tag[tags.size ()]);
 
@@ -98,15 +82,7 @@ public class Database {
 
 		ArrayList<Integer> tagIds = new ArrayList<> ();
 
-		Statement s = c.createStatement ();
-
-		ResultSet rs = s.executeQuery (String.format ("select tag from tagged where path='%s'", getFilteredData (path)));
-
-		while (rs.next ()) { tagIds.add (rs.getInt ("tag")); }
-
-		rs.close ();
-
-		s.close ();
+		handleQuery (rs -> tagIds.add (rs.getInt ("tag")), format ("select tag from tagged where path='%s'", getFilteredData (path)));
 
 		return tagIds;
 
@@ -114,7 +90,7 @@ public class Database {
 
 	public void refreshDatabase (String[] blacklistExtensions) throws SQLException, IOException {
 
-		System.out.println ("Started refresh...");
+		System.out.println ("Starting refresh...");
 
 		ArrayList<Path> paths = new ArrayList<> ();
 
@@ -137,7 +113,7 @@ public class Database {
 
 			String sqlPath = getFilteredData (path.subpath (nameCountDir, path.getNameCount ()).toString ());
 
-			ResultSet rs = s.executeQuery (String.format ("select * from files where path='%s'", sqlPath));
+			ResultSet rs = s.executeQuery (format ("select * from files where path='%s'", sqlPath));
 
 			if (rs.next ()) continue;
 
@@ -151,11 +127,7 @@ public class Database {
 
 	}
 
-	public String getFilteredData (String data) {
-
-		return data.replaceAll ("'", "''");
-
-	}
+	public String getFilteredData (String data) { return data.replaceAll ("'", "''"); }
 
 	public static void getPaths (Path dir, ArrayList<Path> paths) throws IOException {
 
@@ -178,22 +150,21 @@ public class Database {
 
 	public void setItem (ItemEditor ie, String path) throws SQLException {
 
-		Statement s = c.createStatement ();
-
-		ResultSet rs = s.executeQuery (String.format ("select * from files where path='%s'", getFilteredData (path)));
-
-		if (rs.next ()) ie.setItem (getFilteredData (rs.getString ("path")), getFilteredData (rs.getString ("title")), rs.getLong ("size"), rs.getLong ("datecreated"), getTags (path));
-
-		rs.close (); s.close ();
+		// will mess up if there's duplicate items I think but there shouldn't since sql prevents it
+		handleQuery (rs ->
+				ie.setItem (getFilteredData (rs.getString ("path")),
+					getFilteredData (rs.getString ("title")),
+					rs.getLong ("size"),
+					rs.getLong ("datecreated"),
+					getTags (path))
+			, format ("select * from files where path='%s'", getFilteredData (path)));
 
 	}
-
-	// path, title, size, datecreated
 
 	public void addItem (Path path, String sqlPath) throws SQLException, IOException {
 
 		//TODO: dunno if reusing statement is best
-		executeSingle (String.format ("insert into files values ('%s', '%s', %s, %s)",
+		execute (format ("insert into files values ('%s', '%s', %s, %s)",
 			sqlPath, "Untitled", Files.size (path), creationDate (path).toMillis ()));
 
 		System.out.println ("Added " + sqlPath);
@@ -202,28 +173,26 @@ public class Database {
 
 	public void removeItem (String path) throws SQLException {
 
-		Statement s = c.createStatement ();
-
 		String sqlPath = getFilteredData (path);
 
-		s.execute (String.format ("delete from files where path='%s'", sqlPath));
-		s.execute (String.format ("delete from tagged where path='%s'", sqlPath));
+		execute (format ("delete from files where path='%s'", sqlPath),
+			format ("delete from tagged where path='%s'", sqlPath));
 
-		s.close ();
+		System.out.println ("Removed " + sqlPath + " and its tags");
 
 	}
 
-	public void addTag (Tag tag, String filePath) throws SQLException { executeSingle (String.format ("insert into tagged (tag, path) values (%d, '%s')", tag.getId (), getFilteredData (filePath)));}
+	public void addTag (Tag tag, String filePath) throws SQLException { execute (format ("insert into tagged (tag, path) values (%d, '%s')", tag.getId (), getFilteredData (filePath)));}
 
-	public void removeTag (Tag tag, String filePath) throws SQLException { executeSingle (String.format ("delete from tagged where tag=%d and path='%s'", tag.getId (), getFilteredData (filePath)));}
+	public void removeTag (Tag tag, String filePath) throws SQLException { execute (format ("delete from tagged where tag=%d and path='%s'", tag.getId (), getFilteredData (filePath)));}
 
-	public void updateTitle (String title, String filePath) throws SQLException { executeSingle (String.format ("update files set title='%s' where path='%s'", getFilteredData (title), getFilteredData (filePath))); }
+	public void updateTitle (String title, String filePath) throws SQLException { execute (format ("update files set title='%s' where path='%s'", getFilteredData (title), getFilteredData (filePath))); }
 
-	private void executeSingle (String sql) throws SQLException {
+	private void execute (String... sqls) throws SQLException {
 
 		Statement s = c.createStatement ();
 
-		s.execute (sql);
+		for (String sql : sqls) s.execute (sql);
 
 		s.close ();
 
@@ -235,13 +204,9 @@ public class Database {
 			BasicFileAttributes a = Files.readAttributes (path, BasicFileAttributes.class);
 
 			return a.lastModifiedTime ();
-
 		}
 
-		catch (IOException e) {
-			return null;
-
-		}
+		catch (IOException e) { return null; }
 
 	}
 
@@ -272,5 +237,21 @@ public class Database {
 
 	public String getPath () { return stringDir; }
 
+	interface ResultSetHandler {
+		void handle (ResultSet rs) throws SQLException;
+
+	}
+
+	public void handleQuery (ResultSetHandler handler, String query, String... params) throws SQLException {
+
+		Statement s = c.createStatement ();
+
+		ResultSet rs = s.executeQuery (format (query, params));
+
+		while (rs.next ()) handler.handle (rs);
+
+		rs.close (); s.close ();
+
+	}
 
 }
